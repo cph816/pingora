@@ -145,6 +145,8 @@ where
         mut stream: Stream,
         shutdown: &ShutdownWatch,
     ) -> Option<Stream> {
+        eprintln!("h2c_debug: process_new ENTERED");
+
         let mut h2c = self.server_options().as_ref().map_or(false, |o| o.h2c);
         let is_tls = stream.get_ssl_digest().is_some();
         let alpn = stream.selected_alpn_proto();
