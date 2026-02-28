@@ -146,11 +146,15 @@ where
         shutdown: &ShutdownWatch,
     ) -> Option<Stream> {
         let mut h2c = self.server_options().as_ref().map_or(false, |o| o.h2c);
+        let is_tls = stream.get_ssl_digest().is_some();
+        let alpn = stream.selected_alpn_proto();
 
-        // Only do h2c preface detection on cleartext connections where ALPN is not available.
-        // On TLS connections, ALPN already negotiated the protocol, so peeking is unnecessary
-        // and corrupts HTTP/1.1 sessions (the peek+rewind interferes with the HTTP/1.1 parser).
-        if h2c && stream.selected_alpn_proto().is_none() {
+        warn!(
+            "h2c_debug: h2c={h2c} is_tls={is_tls} alpn={alpn:?}"
+        );
+
+        // try to read h2 preface
+        if h2c {
             let mut buf = [0u8; H2_PREFACE.len()];
             let peeked = stream
                 .try_peek(&mut buf)
@@ -166,6 +170,10 @@ where
                 // turn off h2c (use h1) if h2 preface doesn't exist
                 h2c = buf == H2_PREFACE;
             }
+            warn!(
+                "h2c_debug: after peek peeked={peeked} h2c={h2c} buf_start={:02x}{:02x}{:02x}{:02x}",
+                buf[0], buf[1], buf[2], buf[3]
+            );
         }
         if h2c || matches!(stream.selected_alpn_proto(), Some(ALPN::H2)) {
             // create a shared connection digest
