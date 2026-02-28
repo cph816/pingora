@@ -147,8 +147,10 @@ where
     ) -> Option<Stream> {
         let mut h2c = self.server_options().as_ref().map_or(false, |o| o.h2c);
 
-        // try to read h2 preface
-        if h2c {
+        // Only do h2c preface detection on cleartext connections where ALPN is not available.
+        // On TLS connections, ALPN already negotiated the protocol, so peeking is unnecessary
+        // and corrupts HTTP/1.1 sessions (the peek+rewind interferes with the HTTP/1.1 parser).
+        if h2c && stream.selected_alpn_proto().is_none() {
             let mut buf = [0u8; H2_PREFACE.len()];
             let peeked = stream
                 .try_peek(&mut buf)
