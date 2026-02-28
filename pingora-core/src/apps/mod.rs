@@ -166,10 +166,14 @@ where
                     e
                 })
                 .ok()?;
-            // not all streams support peeking
+            // not all streams support peeking (e.g. TLS streams return false)
             if peeked {
                 // turn off h2c (use h1) if h2 preface doesn't exist
                 h2c = buf == H2_PREFACE;
+            } else {
+                // Peek not supported (e.g. TLS stream). Don't assume HTTP/2 —
+                // fall through to ALPN check or HTTP/1.1 fallback.
+                h2c = false;
             }
             eprintln!(
                 "h2c_debug: after peek peeked={peeked} h2c={h2c} buf_start={:02x}{:02x}{:02x}{:02x}",
