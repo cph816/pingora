@@ -149,7 +149,7 @@ where
         let is_tls = stream.get_ssl_digest().is_some();
         let alpn = stream.selected_alpn_proto();
 
-        warn!(
+        eprintln!(
             "h2c_debug: h2c={h2c} is_tls={is_tls} alpn={alpn:?}"
         );
 
@@ -160,8 +160,7 @@ where
                 .try_peek(&mut buf)
                 .await
                 .map_err(|e| {
-                    // this error is normal when h1 reuse and close the connection
-                    debug!("Read error while peeking h2c preface {e}");
+                    eprintln!("h2c_debug: Read error while peeking h2c preface {e}");
                     e
                 })
                 .ok()?;
@@ -170,7 +169,7 @@ where
                 // turn off h2c (use h1) if h2 preface doesn't exist
                 h2c = buf == H2_PREFACE;
             }
-            warn!(
+            eprintln!(
                 "h2c_debug: after peek peeked={peeked} h2c={h2c} buf_start={:02x}{:02x}{:02x}{:02x}",
                 buf[0], buf[1], buf[2], buf[3]
             );
