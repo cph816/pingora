@@ -19,7 +19,7 @@ pub mod prometheus_http_app;
 
 use crate::server::ShutdownWatch;
 use async_trait::async_trait;
-use log::{debug, error};
+use log::{debug, error, warn};
 use std::future::poll_fn;
 use std::sync::Arc;
 
