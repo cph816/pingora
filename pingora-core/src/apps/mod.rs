@@ -162,16 +162,27 @@ where
             .server_options()
             .as_ref()
             .map_or(false, |o| o.force_custom);
+        let is_tls = stream.get_ssl_digest().is_some();
+        let alpn = stream.selected_alpn_proto();
 
-        // try to read h2 preface
-        if h2c && !custom {
+        eprintln!("h2c_debug: h2c={h2c} is_tls={is_tls} alpn={alpn:?}");
+
+        // h2c preface detection: only on cleartext (non-TLS) connections.
+        // h2c ("HTTP/2 cleartext") is by definition a cleartext-only mechanism.
+        // On TLS, ALPN negotiates the protocol during the handshake.
+        // When h2c detection runs on TLS streams, try_peek returns peeked=false,
+        // leaving h2c=true unconditionally and forcing all TLS connections into
+        // the HTTP/2 branch — breaking HTTP/1.1 clients.
+        if is_tls {
+            h2c = false;
+            eprintln!("h2c_debug: TLS stream, skipping h2c peek, h2c=false");
+        } else if h2c && !custom {
             let mut buf = [0u8; H2_PREFACE.len()];
             let peeked = stream
                 .try_peek(&mut buf)
                 .await
                 .map_err(|e| {
-                    // this error is normal when h1 reuse and close the connection
-                    debug!("Read error while peeking h2c preface {e}");
+                    eprintln!("h2c_debug: Read error while peeking h2c preface {e}");
                     e
                 })
                 .ok()?;
@@ -180,6 +191,10 @@ where
                 // turn off h2c (use h1) if h2 preface doesn't exist
                 h2c = buf == H2_PREFACE;
             }
+            eprintln!(
+                "h2c_debug: after peek peeked={peeked} h2c={h2c} buf_start={:02x}{:02x}{:02x}{:02x}",
+                buf[0], buf[1], buf[2], buf[3]
+            );
         }
         if h2c || matches!(stream.selected_alpn_proto(), Some(ALPN::H2)) {
             // create a shared connection digest
