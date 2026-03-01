@@ -155,8 +155,9 @@ where
             "h2c_debug: h2c={h2c} is_tls={is_tls} alpn={alpn:?}"
         );
 
-        // try to read h2 preface
-        if h2c {
+        // h2c preface detection: only on cleartext (non-TLS) connections.
+        // On TLS, ALPN negotiates the protocol; h2c ("HTTP/2 cleartext") is not applicable.
+        if h2c && !is_tls {
             let mut buf = [0u8; H2_PREFACE.len()];
             let peeked = stream
                 .try_peek(&mut buf)
@@ -175,6 +176,10 @@ where
                 "h2c_debug: after peek peeked={peeked} h2c={h2c} buf_start={:02x}{:02x}{:02x}{:02x}",
                 buf[0], buf[1], buf[2], buf[3]
             );
+        } else if is_tls {
+            // TLS: don't use h2c, let ALPN decide
+            h2c = false;
+            eprintln!("h2c_debug: TLS stream, skipping h2c peek, h2c=false");
         }
         if h2c || matches!(stream.selected_alpn_proto(), Some(ALPN::H2)) {
             // create a shared connection digest
